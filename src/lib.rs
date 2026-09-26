@@ -7,7 +7,6 @@ use data::{
     ASYM_VOWEL,
 };
 use bitflags::bitflags;
-use mecab_ko_hangul::{is_hangul, is_jamo};
 use multi_bimap::HashMultiBimap;
 use crate::helpers::{HashMultiBimapExt, IteratorExt, HangulUnit, split_hangul};
 
@@ -21,7 +20,6 @@ bitflags! {
 }
 
 pub fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
-    //let policy = policy.unwrap_or_default();
     ALWAYS
         .iter()
         .copied()
@@ -31,11 +29,6 @@ pub fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
         .collect_bimap()
 }
 
-// pub fn check_overlap_jamo(under: char, over: char, policy: Option<OverlapPolicy>) -> Option<bool> {
-//     if !is_jamo(under) || !is_hangul(over) {return None;};
-//     Some(get_bimap(policy).contains_relation(&under, &over))
-// }
-
 fn check_overlap_jamo(under: char, over: char, bimap: &HashMultiBimap<char, char>) -> bool {
     under==over || bimap.contains_relation(&under, &over)
 }
@@ -43,43 +36,15 @@ fn check_overlap_jamo(under: char, over: char, bimap: &HashMultiBimap<char, char
 fn check_overlap_jamo_opt_handled(under: Option<char>, over: Option<char>, bimap: &HashMultiBimap<char, char>) -> bool {
     let Some(under) = under else {return true;};
     let Some(over) = over else {return false;}; // under is Some and over is None. Which means over can't overlap under.
-    //if !is_hangul(under) || !is_hangul(over) {return None;};
 
     check_overlap_jamo(under, over, bimap)
 }
-
-// fn check_overlap_jamo_to_syl(under: char, over: (char, char, Option<char>), bimap: &HashMultiBimap<char, char>) -> bool {
-//     check_overlap_jamo(under, over.0, bimap)
-//     || check_overlap_jamo(under, over.1, bimap)
-//     || over.2.is_some_and(|jong| check_overlap_jamo(under, jong, bimap))
-// }
 
 pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<bool> {
     let bimap = get_bimap(policy);
 
     let under = split_hangul(under)?;
     let over = split_hangul(over)?;
-
-    // match under {
-    //     HangulUnit::Jamo(underjamo) => {
-    //         match over {
-    //             HangulUnit::Jamo(overjamo) => Some(check_overlap_jamo(underjamo, overjamo, &bimap)),
-    //             HangulUnit::Syllable{cho: overcho, jung: overjung, jong: overjong} => Some(check_overlap_jamo_to_syl(underjamo, (overcho, overjung, overjong), &bimap)),
-    //         }
-    //     }
-    //     HangulUnit::Syllable { cho: undercho, jung: underjung, jong: underjong } => {
-    //         match over {
-    //             HangulUnit::Jamo(_) => Some(false),
-    //             HangulUnit::Syllable { cho: overcho , jung: overjung , jong: overjong } => {
-    //                 Some(
-    //                     check_overlap_jamo(undercho, overcho, &bimap)
-    //                     && check_overlap_jamo(underjung, overjung, &bimap)
-    //                     && check_overlap_jamo_opt_handled(underjong, overjong, &bimap)
-    //                 )
-    //             }
-    //         }
-    //     }
-    // }
 
     Some(match (under, over) {
         (
