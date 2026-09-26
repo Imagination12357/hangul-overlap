@@ -1,0 +1,9 @@
+[package]
+name = "hangul-overlap"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bitflags = "2.13.2"
+mecab-ko-hangul = "0.7.2"
+multi_bimap = "0.6.0"
