@@ -8,7 +8,7 @@ use data::{
 };
 use bitflags::bitflags;
 use multi_bimap::HashMultiBimap;
-use crate::helpers::{HashMultiBimapExt, IteratorExt, HangulUnit, split_hangul};
+use crate::helpers::{HangulJamo, HashMultiBimapExt, IteratorExt, split_hangul};
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -29,15 +29,13 @@ pub fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
         .collect_bimap()
 }
 
-fn check_overlap_jamo(under: char, over: char, bimap: &HashMultiBimap<char, char>) -> bool {
-    under==over || bimap.contains_relation(&under, &over)
-}
-
-fn check_overlap_jamo_opt_handled(under: Option<char>, over: Option<char>, bimap: &HashMultiBimap<char, char>) -> bool {
-    let Some(under) = under else {return true;};
-    let Some(over) = over else {return false;}; // under is Some and over is None. Which means over can't overlap under.
-
-    check_overlap_jamo(under, over, bimap)
+fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &HashMultiBimap<char, char>) -> bool {
+    under==over || match (under, over) {
+        (HangulJamo::Some(under), HangulJamo::Some(over)) => bimap.contains_relation(&under, &over),
+        (HangulJamo::None, HangulJamo::None) => true, // Can't reach here, but I wrote this...
+        (HangulJamo::Some(_), HangulJamo::None) => false,
+        (HangulJamo::None, HangulJamo::Some(_)) => true,
+    }
 }
 
 pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<bool> {
@@ -46,35 +44,21 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
     let under = split_hangul(under)?;
     let over = split_hangul(over)?;
 
-    Some(match (under, over) {
-        (
-            HangulUnit::Jamo(underjamo),
-            HangulUnit::Jamo(overjamo)
-        ) => check_overlap_jamo(underjamo, overjamo, &bimap),
-
-        (
-            HangulUnit::Jamo(underjamo),
-            HangulUnit::Syllable{cho: overcho, jung: overjung, jong: overjong}
-        ) => {
-            check_overlap_jamo(underjamo, overcho, &bimap)
-            || check_overlap_jamo(underjamo, overjung, &bimap)
-            || overjong.is_some_and(|overjong| check_overlap_jamo(underjamo, overjong, &bimap))
-        },
-
-        (
-            HangulUnit::Syllable{..},
-            HangulUnit::Jamo(_)
-        ) => false, // under is full syllable, and over is jamo, which can't overlap under always.
-
-        (
-            HangulUnit::Syllable { cho: undercho, jung: underjung, jong: underjong },
-            HangulUnit::Syllable { cho: overcho , jung: overjung , jong: overjong }
-        ) => {
-            check_overlap_jamo(undercho, overcho, &bimap)
-            && check_overlap_jamo(underjung, overjung, &bimap)
-            && check_overlap_jamo_opt_handled(underjong, overjong, &bimap)
-        }
-    })
+    Some(
+        check_overlap_jamo(under.0, over.0, &bimap)
+        && check_overlap_jamo(under.1, over.1, &bimap)
+        && check_overlap_jamo(under.2, over.2, &bimap)
+        ||(
+            (under.0 != HangulJamo::None && under.1 == HangulJamo::None && under.2 == HangulJamo::None) && (
+                check_overlap_jamo(under.0, over.2, &bimap)
+            ) // if under is single consonant
+        )
+        ||(
+            (under.0 == HangulJamo::None && under.1 == HangulJamo::None && under.2 != HangulJamo::None) && (
+                check_overlap_jamo(under.2, over.1, &bimap)
+            ) // if under is single complex consonant
+        )
+    )
 }
 
 #[cfg(test)]

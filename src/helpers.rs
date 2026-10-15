@@ -1,8 +1,7 @@
 use std::hash::Hash;
 use multi_bimap::HashMultiBimap;
 use mecab_ko_hangul::{
-    is_jamo,
-    decompose,
+    decompose, is_choseong, is_jungseong, is_jamo
 };
 
 // Generated using AI.
@@ -56,21 +55,82 @@ where
     }
 }
 
-pub enum HangulUnit {
-    Syllable {
-        cho: char,
-        jung: char,
-        jong: Option<char>,
-    },
-    Jamo(char),
+pub type HangulJamo = Option<char>;
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct HangulUnit (pub HangulJamo, pub HangulJamo, pub HangulJamo);
+
+impl HangulUnit {
+    pub fn new_from_cho(ch: char) -> HangulUnit {
+        HangulUnit(
+            HangulJamo::Some(ch),
+            HangulJamo::None,
+            HangulJamo::None,
+        )
+    }
+    pub fn new_from_jung(ch: char) -> HangulUnit {
+        HangulUnit(
+            HangulJamo::None,
+            HangulJamo::Some(ch),
+            HangulJamo::None,
+        )
+    }
+    pub fn new_from_jong(ch: char) -> HangulUnit {
+        HangulUnit(
+            HangulJamo::None,
+            HangulJamo::None,
+            HangulJamo::Some(ch),
+        )
+    }
+}
+
+fn is_cc(c: char) -> bool {
+    is_jamo(c) && !is_choseong(c) && !is_jungseong(c)
 }
 
 pub fn split_hangul(ch: char) -> Option<HangulUnit> {
     if let Some((cho, jung, jong)) = decompose(ch) {
-        Some(HangulUnit::Syllable{cho, jung, jong})
-    } else if is_jamo(ch) {
-        Some(HangulUnit::Jamo(ch))
+        Some(HangulUnit(
+            HangulJamo::Some(cho),
+            HangulJamo::Some(jung),
+            jong,
+        ))
+    } else if is_choseong(ch) {
+        Some(HangulUnit::new_from_cho(ch))
+    } else if is_jungseong(ch) {
+        Some(HangulUnit::new_from_jung(ch))
+    } else if is_cc(ch) {
+        Some(HangulUnit::new_from_jong(ch))
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn check_is_cc() {
+        assert!(is_cc('ㄳ'));
+        assert!(is_cc('ㄵ'));
+        assert!(is_cc('ㄶ'));
+        assert!(is_cc('ㄺ'));
+        assert!(is_cc('ㄻ'));
+        assert!(is_cc('ㄼ'));
+        assert!(is_cc('ㄽ'));
+        assert!(is_cc('ㄾ'));
+        assert!(is_cc('ㄿ'));
+        assert!(is_cc('ㅀ'));
+        assert!(is_cc('ㅄ'));
+
+        assert!(!is_cc('ㄱ'));
+        assert!(!is_cc('가'));
+        assert!(!is_cc('ㅏ'));
+        assert!(!is_cc('ㄲ'));
+        assert!(!is_cc('까'));
+        assert!(!is_cc('악'));
+        assert!(!is_cc('앆'));
+        assert!(!is_cc('앇'));
     }
 }
