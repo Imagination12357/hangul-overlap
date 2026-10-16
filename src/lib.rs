@@ -9,6 +9,7 @@ use data::{
 use bitflags::bitflags;
 use multi_bimap::HashMultiBimap;
 use itertools::{iproduct, Itertools};
+use std::sync::LazyLock;
 use crate::helpers::{HangulJamo, HashMultiBimapExt, IteratorExt, compose_hangul_jamo, split_hangul};
 
 bitflags! {
@@ -20,7 +21,27 @@ bitflags! {
     }
 }
 
-fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
+// Generated using AI.
+// Each slot is initialized only when its policy combination is first requested.
+static BIMAPS: [LazyLock<HashMultiBimap<char, char>>; 8] = [
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(0))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(1))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(2))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(3))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(4))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(5))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(6))),
+    LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(7))),
+];
+
+// Generated using AI.
+fn get_bimap(policy: OverlapPolicy) -> &'static HashMultiBimap<char, char> {
+    // Unknown bits do not affect the relations selected by build_bimap.
+    let index = (policy & OverlapPolicy::all()).bits() as usize;
+    LazyLock::force(&BIMAPS[index])
+}
+
+fn build_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
     ALWAYS
         .iter()
         .copied()
@@ -46,17 +67,17 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
     let over = split_hangul(over)?;
 
     Some(
-        check_overlap_jamo(under.0, over.0, &bimap)
-        && check_overlap_jamo(under.1, over.1, &bimap)
-        && check_overlap_jamo(under.2, over.2, &bimap)
+        check_overlap_jamo(under.0, over.0, bimap)
+        && check_overlap_jamo(under.1, over.1, bimap)
+        && check_overlap_jamo(under.2, over.2, bimap)
         ||(
             (under.0 != HangulJamo::None && under.1 == HangulJamo::None && under.2 == HangulJamo::None) && (
-                check_overlap_jamo(under.0, over.2, &bimap)
+                check_overlap_jamo(under.0, over.2, bimap)
             ) // if under is single consonant
         )
         ||(
             (under.0 == HangulJamo::None && under.1 == HangulJamo::None && under.2 != HangulJamo::None) && (
-                check_overlap_jamo(under.2, over.1, &bimap)
+                check_overlap_jamo(under.2, over.1, bimap)
             ) // if under is single complex consonant
         )
     )
@@ -158,6 +179,26 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Generated using AI.
+    #[test]
+    fn test_cached_bimaps_match_builds() {
+        for bits in 0..8 {
+            let policy = OverlapPolicy::from_bits_retain(bits);
+            assert_eq!(get_bimap(policy), &build_bimap(policy));
+            assert!(std::ptr::eq(get_bimap(policy), get_bimap(policy)));
+        }
+    }
+
+    // Generated using AI.
+    #[test]
+    fn test_cached_bimaps_ignore_unknown_bits() {
+        for bits in 0..=u8::MAX {
+            let policy = OverlapPolicy::from_bits_retain(bits);
+            let known_policy = policy & OverlapPolicy::all();
+            assert!(std::ptr::eq(get_bimap(policy), get_bimap(known_policy)));
+        }
+    }
 
     #[test]
     fn test_check_overlap_always() {
