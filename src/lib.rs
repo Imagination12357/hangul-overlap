@@ -112,7 +112,11 @@ pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     };
 
     Some(
-        iproduct!(cho_list, jung_list, jong_list)
+        iproduct!(
+            cho_list.iter().copied(),
+            jung_list.iter().copied(),
+            jong_list.iter().copied()
+        )
             .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
             .chain_if_lazy(
                 ch.0 != None && ch.1 == None && ch.2 == None,
@@ -155,7 +159,11 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     };
 
     Some(
-        iproduct!(cho_list, jung_list, jong_list)
+        iproduct!(
+            cho_list.iter().copied(),
+            jung_list.iter().copied(),
+            jong_list.iter().copied()
+        )
             .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
             .chain_if_lazy(
                 ch.0 != None,
