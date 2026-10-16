@@ -8,6 +8,7 @@ use std::hint::black_box;
 // Commit    Duration    Cycles    Notes
 // 1e8143d   577 ms      1         Initial implementation
 // 59845bb   494 ms      100       LazyLock bimap cache
+// 2011751   404 ms      100       Avoid cloning in iproduct!
 fn main() {
     for _ in 0..100{
         for code in ('가' as u32)..=('나' as u32) {
