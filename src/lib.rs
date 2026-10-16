@@ -8,7 +8,8 @@ use data::{
 };
 use bitflags::bitflags;
 use multi_bimap::HashMultiBimap;
-use crate::helpers::{HangulJamo, HashMultiBimapExt, IteratorExt, split_hangul};
+use itertools::{iproduct, Itertools};
+use crate::helpers::{HangulJamo, HashMultiBimapExt, IteratorExt, compose_hangul_jamo, split_hangul};
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -23,9 +24,9 @@ pub fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
     ALWAYS
         .iter()
         .copied()
-        .chain_if(policy.contains(OverlapPolicy::DOUBLE_CONSONANT), DOUBLE_CONSONANT.iter().copied())
-        .chain_if(policy.contains(OverlapPolicy::COMPLEX_CONSONANT), COMPLEX_CONSONANT.iter().copied())
-        .chain_if(policy.contains(OverlapPolicy::ASYM_VOWEL), ASYM_VOWEL.iter().copied())
+        .chain_if_lazy(policy.contains(OverlapPolicy::DOUBLE_CONSONANT), || DOUBLE_CONSONANT.iter().copied())
+        .chain_if_lazy(policy.contains(OverlapPolicy::COMPLEX_CONSONANT), || COMPLEX_CONSONANT.iter().copied())
+        .chain_if_lazy(policy.contains(OverlapPolicy::ASYM_VOWEL), || ASYM_VOWEL.iter().copied())
         .collect_bimap()
 }
 
@@ -58,6 +59,99 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
                 check_overlap_jamo(under.2, over.1, &bimap)
             ) // if under is single complex consonant
         )
+    )
+}
+
+pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
+    let bimap = get_bimap(policy);
+    let ch = split_hangul(ch)?;
+
+    let cho_list: Vec<HangulJamo> = match ch.0 {
+        Some(cho) => bimap.get_by_left(&cho)
+            .into_iter().flatten().cloned()
+            .chain([cho]).map(Some).collect(),
+        None => ('ㄱ'..='ㅎ')
+            .map(Some).chain([None]).collect(),
+    };
+
+    let jung_list: Vec<HangulJamo> = match ch.1 {
+        Some(jung) => bimap.get_by_left(&jung)
+            .into_iter().flatten().cloned()
+            .chain([jung]).map(Some).collect(),
+        None => ('ㅏ'..='ㅣ')
+            .map(Some).chain([None]).collect(),
+    };
+
+    let jong_list: Vec<HangulJamo> = match ch.2 {
+        Some(jong) => bimap.get_by_left(&jong)
+            .into_iter().flatten().cloned()
+            .chain([jong]).map(Some).collect(),
+        None => ('ㄱ'..='ㅎ')
+            .map(Some).chain([None]).collect(),
+    };
+
+    Some(
+        iproduct!(cho_list, jung_list, jong_list)
+            .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
+            .chain_if_lazy(
+                ch.0 != None && ch.1 == None && ch.2 == None,
+                || {
+                    iproduct!(
+                        ('ㄱ'..='ㅎ').map(Some),
+                        ('ㅏ'..='ㅣ').map(Some)
+                    ).map(
+                        |(cho, jung)| compose_hangul_jamo(cho, jung, ch.0)
+                    )
+                }
+            )
+            .flatten().sorted_unstable().dedup().collect()
+    )
+}
+
+pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
+    let bimap = get_bimap(policy);
+    let ch = split_hangul(ch)?;
+
+    let cho_list: Vec<HangulJamo> = match ch.0 {
+        Some(cho) => bimap.get_by_right(&cho)
+            .into_iter().flatten().cloned()
+            .chain([cho]).map(Some).collect(),
+        None => Vec::new(),
+    };
+
+    let jung_list: Vec<HangulJamo> = match ch.1 {
+        Some(jung) => bimap.get_by_right(&jung)
+            .into_iter().flatten().cloned()
+            .chain([jung]).map(Some).collect(),
+        None => Vec::new(),
+    };
+
+    let jong_list: Vec<HangulJamo> = match ch.2 {
+        Some(jong) => bimap.get_by_right(&jong)
+            .into_iter().flatten().cloned()
+            .chain([jong]).map(Some).collect(),
+        None => [None].into(),
+    };
+
+    Some(
+        iproduct!(cho_list, jung_list, jong_list)
+            .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
+            .chain_if_lazy(
+                ch.0 != None,
+                || bimap.get_by_right(&ch.0.unwrap())
+                    .into_iter().flatten().copied().map(Some)
+            )
+            .chain_if_lazy(
+                ch.1 != None,
+                || bimap.get_by_right(&ch.1.unwrap())
+                    .into_iter().flatten().copied().map(Some)
+            )
+            .chain_if_lazy(
+                ch.2 != None,
+                || bimap.get_by_right(&ch.2.unwrap())
+                    .into_iter().flatten().copied().map(Some)
+            )
+            .flatten().sorted_unstable().dedup().collect()
     )
 }
 
@@ -133,5 +227,37 @@ mod tests {
         assert!(check_overlap('악', '햯', OverlapPolicy::all()).unwrap());
         assert!(check_overlap('각', '걗', OverlapPolicy::all()).unwrap());
         assert!(check_overlap('묵', '뷁', OverlapPolicy::all()).unwrap());
+    }
+
+    #[test]
+    #[ignore]
+    fn manual_test_overs_of() {
+        println!("{:?}",overs_of('각', OverlapPolicy::empty()).unwrap());
+    }
+
+    #[test]
+    #[ignore]
+    fn manual_test_unders_of() {
+        println!("{:?}",unders_of('쀏', OverlapPolicy::all()).unwrap());
+    }
+
+    #[test]
+    fn test_overs_of_check_overlap() {
+        let policy = OverlapPolicy::empty();
+        for ch in '꽤'..'꾀'{
+            for over in overs_of(ch, policy).unwrap() {
+                assert!(check_overlap(ch, over, policy).unwrap())
+            }
+        }
+    }
+
+    #[test]
+    fn test_unders_of_check_overlap() {
+        let policy = OverlapPolicy::all();
+        for ch in '꽤'..'꾀'{
+            for under in unders_of(ch, policy).unwrap() {
+                assert!(check_overlap(under, ch, policy).unwrap())
+            }
+        }
     }
 }

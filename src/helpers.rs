@@ -1,7 +1,7 @@
 use std::hash::Hash;
 use multi_bimap::HashMultiBimap;
 use mecab_ko_hangul::{
-    decompose, is_choseong, is_jungseong, is_jamo
+    decompose, is_choseong, is_jungseong, is_jamo, compose
 };
 
 // Generated using AI.
@@ -20,6 +20,18 @@ pub trait IteratorExt: Iterator + Sized {
                 .into_iter()
                 .flatten()
         )
+    }
+
+    fn chain_if_lazy<I, F>(
+        self,
+        condition: bool,
+        iter: F,
+    ) -> impl Iterator<Item = Self::Item>
+    where
+        I: IntoIterator<Item = Self::Item>,
+        F: FnOnce() -> I,
+    {
+        self.chain(condition.then(iter).into_iter().flatten())
     }
 
     fn collect_bimap<L, R>(self) -> HashMultiBimap<L, R>
@@ -103,6 +115,19 @@ pub fn split_hangul(ch: char) -> Option<HangulUnit> {
         Some(HangulUnit::new_from_jong(ch))
     } else {
         None
+    }
+}
+
+pub fn compose_hangul_jamo(cho: HangulJamo, jung: HangulJamo, jong: HangulJamo) -> Option<char> {
+    if let (Some(cho), Some(jung)) = (cho,jung) {
+        compose(cho, jung, jong)
+    } else {
+        match (cho, jung, jong) {
+            (Some(cho), None, None) => Some(cho),
+            (None, Some(jung), None) => Some(jung),
+            (None, None, Some(jong)) => Some(jong),
+            _ => None,
+        }
     }
 }
 
