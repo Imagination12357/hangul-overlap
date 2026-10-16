@@ -20,7 +20,7 @@ bitflags! {
     }
 }
 
-pub fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
+fn get_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
     ALWAYS
         .iter()
         .copied()
