@@ -170,17 +170,17 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
             .chain_if_lazy(
                 ch.0 != None,
                 || bimap.get_by_right(&ch.0.unwrap())
-                    .into_iter().flatten().copied().map(Some)
+                    .into_iter().flatten().copied().chain([ch.0.unwrap()]).map(Some)
             )
             .chain_if_lazy(
                 ch.1 != None,
                 || bimap.get_by_right(&ch.1.unwrap())
-                    .into_iter().flatten().copied().map(Some)
+                    .into_iter().flatten().copied().chain([ch.1.unwrap()]).map(Some)
             )
             .chain_if_lazy(
                 ch.2 != None,
                 || bimap.get_by_right(&ch.2.unwrap())
-                    .into_iter().flatten().copied().map(Some)
+                    .into_iter().flatten().copied().chain([ch.2.unwrap()]).map(Some)
             )
             .flatten().sorted_unstable().dedup().collect()
     )
