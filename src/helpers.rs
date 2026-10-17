@@ -4,22 +4,6 @@ use mecab_ko_hangul::{
 
 // Generated using AI.
 pub(crate) trait IteratorExt: Iterator + Sized {
-    // fn chain_if<I>(
-    //     self,
-    //     condition: bool,
-    //     iter: I,
-    // ) -> impl Iterator<Item = Self::Item>
-    // where
-    //     I: IntoIterator<Item = Self::Item>,
-    // {
-    //     self.chain(
-    //         condition
-    //             .then_some(iter)
-    //             .into_iter()
-    //             .flatten()
-    //     )
-    // }
-
     fn chain_if_lazy<I, F>(
         self,
         condition: bool,
