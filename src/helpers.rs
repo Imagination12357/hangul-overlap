@@ -3,22 +3,22 @@ use mecab_ko_hangul::{
 };
 
 // Generated using AI.
-pub trait IteratorExt: Iterator + Sized {
-    fn chain_if<I>(
-        self,
-        condition: bool,
-        iter: I,
-    ) -> impl Iterator<Item = Self::Item>
-    where
-        I: IntoIterator<Item = Self::Item>,
-    {
-        self.chain(
-            condition
-                .then_some(iter)
-                .into_iter()
-                .flatten()
-        )
-    }
+pub(crate) trait IteratorExt: Iterator + Sized {
+    // fn chain_if<I>(
+    //     self,
+    //     condition: bool,
+    //     iter: I,
+    // ) -> impl Iterator<Item = Self::Item>
+    // where
+    //     I: IntoIterator<Item = Self::Item>,
+    // {
+    //     self.chain(
+    //         condition
+    //             .then_some(iter)
+    //             .into_iter()
+    //             .flatten()
+    //     )
+    // }
 
     fn chain_if_lazy<I, F>(
         self,
@@ -35,27 +35,27 @@ pub trait IteratorExt: Iterator + Sized {
 
 impl<I: Iterator> IteratorExt for I {}
 
-pub type HangulJamo = Option<char>;
+pub(crate) type HangulJamo = Option<char>;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
-pub struct HangulUnit (pub HangulJamo, pub HangulJamo, pub HangulJamo);
+pub(crate) struct HangulUnit (pub(crate) HangulJamo, pub(crate) HangulJamo, pub(crate) HangulJamo);
 
 impl HangulUnit {
-    pub fn new_from_cho(ch: char) -> HangulUnit {
+    pub(crate) fn new_from_cho(ch: char) -> HangulUnit {
         HangulUnit(
             HangulJamo::Some(ch),
             HangulJamo::None,
             HangulJamo::None,
         )
     }
-    pub fn new_from_jung(ch: char) -> HangulUnit {
+    pub(crate) fn new_from_jung(ch: char) -> HangulUnit {
         HangulUnit(
             HangulJamo::None,
             HangulJamo::Some(ch),
             HangulJamo::None,
         )
     }
-    pub fn new_from_jong(ch: char) -> HangulUnit {
+    pub(crate) fn new_from_jong(ch: char) -> HangulUnit {
         HangulUnit(
             HangulJamo::None,
             HangulJamo::None,
@@ -68,7 +68,7 @@ fn is_cc(c: char) -> bool {
     is_jamo(c) && !is_choseong(c) && !is_jungseong(c)
 }
 
-pub fn split_hangul(ch: char) -> Option<HangulUnit> {
+pub(crate) fn split_hangul(ch: char) -> Option<HangulUnit> {
     if let Some((cho, jung, jong)) = decompose(ch) {
         Some(HangulUnit(
             HangulJamo::Some(cho),
@@ -86,7 +86,7 @@ pub fn split_hangul(ch: char) -> Option<HangulUnit> {
     }
 }
 
-pub fn compose_hangul_jamo(cho: HangulJamo, jung: HangulJamo, jong: HangulJamo) -> Option<char> {
+pub(crate) fn compose_hangul_jamo(cho: HangulJamo, jung: HangulJamo, jong: HangulJamo) -> Option<char> {
     if let (Some(cho), Some(jung)) = (cho,jung) {
         compose(cho, jung, jong)
     } else {
