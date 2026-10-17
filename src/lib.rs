@@ -1,5 +1,6 @@
 mod helpers;
 mod data;
+mod overlap_map;
 use data::{
     ALWAYS,
     DOUBLE_CONSONANT,
@@ -9,7 +10,8 @@ use data::{
 use bitflags::bitflags;
 use itertools::{iproduct, Itertools};
 use std::sync::LazyLock;
-use crate::helpers::{HangulJamo, VecMultiBimap, VecMultiBimapExt, IteratorExt, compose_hangul_jamo, split_hangul};
+use crate::helpers::{HangulJamo, IteratorExt, compose_hangul_jamo, split_hangul};
+use crate::overlap_map::OverlapMap;
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -22,7 +24,7 @@ bitflags! {
 
 // Generated using AI.
 // Each slot is initialized only when its policy combination is first requested.
-static BIMAPS: [LazyLock<VecMultiBimap<char, char>>; 8] = [
+static BIMAPS: [LazyLock<OverlapMap>; 8] = [
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(0))),
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(1))),
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(2))),
@@ -34,23 +36,24 @@ static BIMAPS: [LazyLock<VecMultiBimap<char, char>>; 8] = [
 ];
 
 // Generated using AI.
-fn get_bimap(policy: OverlapPolicy) -> &'static VecMultiBimap<char, char> {
+fn get_bimap(policy: OverlapPolicy) -> &'static OverlapMap {
     // Unknown bits do not affect the relations selected by build_bimap.
     let index = (policy & OverlapPolicy::all()).bits() as usize;
     LazyLock::force(&BIMAPS[index])
 }
 
-fn build_bimap(policy: OverlapPolicy) -> VecMultiBimap<char, char> {
-    ALWAYS
-        .iter()
-        .copied()
-        .chain_if_lazy(policy.contains(OverlapPolicy::DOUBLE_CONSONANT), || DOUBLE_CONSONANT.iter().copied())
-        .chain_if_lazy(policy.contains(OverlapPolicy::COMPLEX_CONSONANT), || COMPLEX_CONSONANT.iter().copied())
-        .chain_if_lazy(policy.contains(OverlapPolicy::ASYM_VOWEL), || ASYM_VOWEL.iter().copied())
-        .collect_bimap()
+fn build_bimap(policy: OverlapPolicy) -> OverlapMap {
+    OverlapMap::from_pairs(
+        ALWAYS
+            .iter()
+            .copied()
+            .chain_if_lazy(policy.contains(OverlapPolicy::DOUBLE_CONSONANT), || DOUBLE_CONSONANT.iter().copied())
+            .chain_if_lazy(policy.contains(OverlapPolicy::COMPLEX_CONSONANT), || COMPLEX_CONSONANT.iter().copied())
+            .chain_if_lazy(policy.contains(OverlapPolicy::ASYM_VOWEL), || ASYM_VOWEL.iter().copied())
+    )
 }
 
-fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &VecMultiBimap<char, char>) -> bool {
+fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &OverlapMap) -> bool {
     under==over || match (under, over) {
         (HangulJamo::Some(under), HangulJamo::Some(over)) => bimap.contains_relation(&under, &over),
         (HangulJamo::None, HangulJamo::None) => true, // Can't reach here, but I wrote this...
@@ -186,6 +189,49 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Generated using AI.
+    #[test]
+    fn test_cached_relations_match_policy_tables() {
+        let jamo: Vec<char> = ('ㄱ'..='ㅣ').chain(['A']).collect();
+
+        for bits in 0..8 {
+            let policy = OverlapPolicy::from_bits_retain(bits);
+            let mut expected = ALWAYS.to_vec();
+            if bits & 1 != 0 {
+                expected.extend_from_slice(DOUBLE_CONSONANT);
+            }
+            if bits & 2 != 0 {
+                expected.extend_from_slice(COMPLEX_CONSONANT);
+            }
+            if bits & 4 != 0 {
+                expected.extend_from_slice(ASYM_VOWEL);
+            }
+
+            let map = get_bimap(policy);
+            for &key in &jamo {
+                let rights: Vec<char> = expected.iter()
+                    .filter(|(left, _)| *left == key)
+                    .map(|(_, right)| *right).collect();
+                let lefts: Vec<char> = expected.iter()
+                    .filter(|(_, right)| *right == key)
+                    .map(|(left, _)| *left).collect();
+
+                assert_eq!(map.get_by_left(&key),
+                    (!rights.is_empty()).then_some(rights.as_slice()),
+                    "left lookup: {policy:?}, {key}");
+                assert_eq!(map.get_by_right(&key),
+                    (!lefts.is_empty()).then_some(lefts.as_slice()),
+                    "right lookup: {policy:?}, {key}");
+
+                for &right in &jamo {
+                    assert_eq!(map.contains_relation(&key, &right),
+                        expected.contains(&(key, right)),
+                        "relation: {policy:?}, {key}, {right}");
+                }
+            }
+        }
+    }
 
     // Generated using AI.
     #[test]

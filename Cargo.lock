@@ -21,7 +21,7 @@ dependencies = [
  "bitflags",
  "itertools",
  "mecab-ko-hangul",
- "multi_bimap",
+ "rustc-hash",
 ]
 
 [[package]]
@@ -34,22 +34,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "maplike"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd156cceffdd663ffb42053c3cdaf8adeb574d38e960700b1634f5b97bec7bdd"
-
-[[package]]
 name = "mecab-ko-hangul"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e511017fbf1a491cb25c58095b84ca00c97319c55eee1b62922672684fa0df24"
 
 [[package]]
-name = "multi_bimap"
-version = "0.6.0"
+name = "rustc-hash"
+version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd560d482ec3d1cc255c5d255d0a4d36db2d79a85556d28a74943a1ffc0da485"
-dependencies = [
- "maplike",
-]
+checksum = "6b1e7f9a428571be2dc5bc0505c13fb6bf936822b894ec87abf8a08a4e51742d"
