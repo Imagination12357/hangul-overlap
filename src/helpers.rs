@@ -1,8 +1,11 @@
 use std::hash::Hash;
-use multi_bimap::HashMultiBimap;
+use std::collections::HashMap;
+use multi_bimap::MultiBimap;
 use mecab_ko_hangul::{
     decompose, is_choseong, is_jungseong, is_jamo, compose
 };
+
+pub type VecMultiBimap<L, R> = MultiBimap<HashMap<L, Vec<R>>, HashMap<R, Vec<L>>>;
 
 // Generated using AI.
 pub trait IteratorExt: Iterator + Sized {
@@ -34,13 +37,13 @@ pub trait IteratorExt: Iterator + Sized {
         self.chain(condition.then(iter).into_iter().flatten())
     }
 
-    fn collect_bimap<L, R>(self) -> HashMultiBimap<L, R>
+    fn collect_bimap<L, R>(self) -> VecMultiBimap<L, R>
     where
         Self: Iterator<Item = (L, R)>,
         L: Eq + Hash + Clone,
         R: Eq + Hash + Clone,
     {
-        let mut map = HashMultiBimap::new();
+        let mut map = VecMultiBimap::new();
 
         for (left, right) in self {
             map.insert(left, right);
@@ -52,11 +55,11 @@ pub trait IteratorExt: Iterator + Sized {
 
 impl<I: Iterator> IteratorExt for I {}
 
-pub trait HashMultiBimapExt<L, R> {
+pub trait VecMultiBimapExt<L, R> {
     fn contains_relation(&self, left: &L, right: &R) -> bool;
 }
 
-impl<L, R> HashMultiBimapExt<L, R> for HashMultiBimap<L, R>
+impl<L, R> VecMultiBimapExt<L, R> for VecMultiBimap<L, R>
 where
     L: Eq + Hash + Clone,
     R: Eq + Hash + Clone,

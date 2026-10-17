@@ -7,10 +7,9 @@ use data::{
     ASYM_VOWEL,
 };
 use bitflags::bitflags;
-use multi_bimap::HashMultiBimap;
 use itertools::{iproduct, Itertools};
 use std::sync::LazyLock;
-use crate::helpers::{HangulJamo, HashMultiBimapExt, IteratorExt, compose_hangul_jamo, split_hangul};
+use crate::helpers::{HangulJamo, VecMultiBimap, VecMultiBimapExt, IteratorExt, compose_hangul_jamo, split_hangul};
 
 bitflags! {
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -23,7 +22,7 @@ bitflags! {
 
 // Generated using AI.
 // Each slot is initialized only when its policy combination is first requested.
-static BIMAPS: [LazyLock<HashMultiBimap<char, char>>; 8] = [
+static BIMAPS: [LazyLock<VecMultiBimap<char, char>>; 8] = [
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(0))),
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(1))),
     LazyLock::new(|| build_bimap(OverlapPolicy::from_bits_retain(2))),
@@ -35,13 +34,13 @@ static BIMAPS: [LazyLock<HashMultiBimap<char, char>>; 8] = [
 ];
 
 // Generated using AI.
-fn get_bimap(policy: OverlapPolicy) -> &'static HashMultiBimap<char, char> {
+fn get_bimap(policy: OverlapPolicy) -> &'static VecMultiBimap<char, char> {
     // Unknown bits do not affect the relations selected by build_bimap.
     let index = (policy & OverlapPolicy::all()).bits() as usize;
     LazyLock::force(&BIMAPS[index])
 }
 
-fn build_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
+fn build_bimap(policy: OverlapPolicy) -> VecMultiBimap<char, char> {
     ALWAYS
         .iter()
         .copied()
@@ -51,7 +50,7 @@ fn build_bimap(policy: OverlapPolicy) -> HashMultiBimap<char, char> {
         .collect_bimap()
 }
 
-fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &HashMultiBimap<char, char>) -> bool {
+fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &VecMultiBimap<char, char>) -> bool {
     under==over || match (under, over) {
         (HangulJamo::Some(under), HangulJamo::Some(over)) => bimap.contains_relation(&under, &over),
         (HangulJamo::None, HangulJamo::None) => true, // Can't reach here, but I wrote this...
