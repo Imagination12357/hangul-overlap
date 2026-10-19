@@ -1,3 +1,37 @@
+//! 한글 문자끼리 겹칠 수 있는지 판정하고, 겹칠 수 있는 글자를 찾습니다.
+//!
+//! 여기서 겹친다는 것은 위 글자가 아래 글자를 완전히 가려 보이지 않게 한다는 뜻입니다.
+//! 실제 글꼴이나 픽셀을 비교하지 않고, 미리 정의된 자모 관계표와 [`OverlapPolicy`]로 판정합니다.
+//!
+//! - [`check_overlap`]: 아래 글자와 위 글자의 겹침 여부를 판정합니다.
+//! - [`overs_of`]: 주어진 글자 위에 겹칠 수 있는 글자를 구합니다.
+//! - [`unders_of`]: 주어진 글자 아래에 놓을 수 있는 글자를 구합니다.
+//!
+//! # 예시
+//!
+//! 관계에는 방향이 있으므로 아래 글자와 위 글자의 순서를 구분해야 합니다.
+//!
+//! ```
+//! use hangul_overlap::{check_overlap, OverlapPolicy};
+//!
+//! let policy = OverlapPolicy::empty();
+//! assert_eq!(check_overlap('ㄱ', 'ㄹ', policy), Some(true));
+//! assert_eq!(check_overlap('ㄹ', 'ㄱ', policy), Some(false));
+//! ```
+//!
+//! # 지원 입력
+//!
+//! 각 함수는 단일 [`char`]를 받습니다. 현대 한글 완성형 음절 `가`-`힣`
+//! (`U+AC00`-`U+D7A3`)과 한글 호환용 자모 `ㄱ`-`ㅣ` (`U+3131`-`U+3163`)를 지원합니다.
+//! 조합용 자모 `ᄀ` (`U+1100`), `ᅡ` (`U+1161`)나 옛한글, 영문, 숫자, 공백 등은
+//! 지원하지 않습니다. 입력은 정규화하지 않고 그대로 처리합니다.
+//!
+//! # 정책
+//!
+//! 기본 자모 관계는 항상 적용합니다. [`OverlapPolicy::empty()`]는 기본 관계만 적용하고,
+//! [`OverlapPolicy::all()`]은 정의된 추가 관계를 모두 허용합니다.
+//! 필요한 플래그만 `|`로 조합할 수도 있습니다.
+//!
 mod helpers;
 mod data;
 mod overlap_map;
@@ -14,10 +48,36 @@ use crate::helpers::{HangulJamo, IteratorExt, compose_hangul_jamo, split_hangul}
 use crate::overlap_map::OverlapMap;
 
 bitflags! {
+    /// 기본 자모 관계에 추가로 허용할 겹침 관계를 선택합니다.
+    ///
+    /// [`Self::empty()`]와 [`Self::default()`]는 기본 관계만 적용합니다.
+    /// 플래그를 켜면 해당 관계를 추가로 허용하며, 기본 관계를 제거하지는 않습니다.
+    /// 같은 자모끼리의 겹침은 플래그와 관계없이 허용합니다.
+    ///
+    /// # 예시
+    ///
+    /// ```
+    /// use hangul_overlap::{check_overlap, OverlapPolicy};
+    ///
+    /// assert_eq!(check_overlap('ㄱ', 'ㄲ', OverlapPolicy::empty()), Some(false));
+    ///
+    /// let policy = OverlapPolicy::DOUBLE_CONSONANT | OverlapPolicy::COMPLEX_CONSONANT;
+    /// assert_eq!(check_overlap('ㄱ', 'ㄲ', policy), Some(true));
+    /// assert_eq!(check_overlap('ㄱ', 'ㄳ', policy), Some(true));
+    /// ```
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
     pub struct OverlapPolicy: u8 {
+        /// 홑자음에서 쌍자음으로 겹치기를 허용합니다.
+        ///
+        /// `ㄱ -> ㄲ`, `ㄷ -> ㄸ`, `ㅂ -> ㅃ`, `ㅅ -> ㅆ`, `ㅈ -> ㅉ`를 추가합니다.
         const DOUBLE_CONSONANT = 1 << 0;
+        /// 구성 자음에서 겹자음으로 겹치기를 허용합니다.
+        ///
+        /// 예를 들어 `ㄱ -> ㄳ`, `ㅅ -> ㄳ`, `ㄴ -> ㄵ`, `ㅈ -> ㄵ`를 추가합니다.
         const COMPLEX_CONSONANT = 1 << 1;
+        /// 기본 관계에 없는 추가 모음 관계를 허용합니다.
+        ///
+        /// 예를 들어 `ㅏ -> ㅑ`, `ㅓ -> ㅕ`, `ㅗ -> ㅛ`, `ㅜ -> ㅠ`를 추가합니다.
         const ASYM_VOWEL = 1 << 2;
     }
 }
@@ -62,6 +122,35 @@ fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &OverlapMap) -
     }
 }
 
+/// `over`로 `under`를 덮을 수 있는지 판정합니다.
+///
+/// `under`는 아래에 놓을 글자, `over`는 위에 겹칠 글자입니다.
+/// 인자 순서를 바꾸면 판정 결과도 달라질 수 있습니다.
+/// 완성형 음절은 초성, 중성, 종성으로 나누어 비교합니다.
+/// 아래 글자에 받침이 없어도 위 글자에는 받침이 올 수 있으며,
+/// 단독 자음은 완성형 음절의 종성과도 비교합니다.
+/// `policy`로 기본 관계에 추가할 자모 관계를 선택합니다.
+///
+/// # 반환값
+///
+/// - `Some(true)`: 해당 정책에서 겹침 관계가 성립합니다. 같은 지원 문자끼리도 여기에 해당합니다.
+/// - `Some(false)`: 두 문자 모두 지원하는 입력이지만 겹침 관계가 성립하지 않습니다.
+/// - `None`: 어느 한쪽이라도 지원하지 않는 문자입니다.
+///
+/// 지원 범위는 [crate 문서의 지원 입력](crate#지원-입력)을 참고하세요.
+///
+/// # 예시
+///
+/// ```
+/// use hangul_overlap::{check_overlap, OverlapPolicy};
+///
+/// let policy = OverlapPolicy::empty();
+/// assert_eq!(check_overlap('가', '각', policy), Some(true));
+/// assert_eq!(check_overlap('각', '가', policy), Some(false));
+/// assert_eq!(check_overlap('ㄱ', '악', policy), Some(true));
+/// assert_eq!(check_overlap('각', '각', policy), Some(true));
+/// assert_eq!(check_overlap('A', '가', policy), None);
+/// ```
 pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<bool> {
     let bimap = get_bimap(policy);
 
@@ -85,6 +174,30 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
     )
 }
 
+/// `ch` 위에 겹칠 수 있는 글자를 구합니다.
+///
+/// `ch`를 아래에 놓을 글자로 사용하고, `policy`로 추가 자모 관계를 선택합니다.
+/// 두 문자를 직접 판정하려면 [`check_overlap`]을, 아래에 놓을 글자를 구하려면
+/// [`unders_of`]를 사용합니다.
+///
+/// # 반환값
+///
+/// 지원하는 입력이면 후보 목록을 `Some(Vec<char>)`로 반환합니다.
+/// 목록은 중복 없이 유니코드 코드 포인트 오름차순으로 정렬됩니다.
+/// `ch` 자신도 포함하므로 빈 벡터는 반환하지 않습니다.
+/// 지원하지 않는 문자에는 `None`을 반환합니다.
+/// 지원 범위는 [crate 문서의 지원 입력](crate#지원-입력)을 참고하세요.
+///
+/// # 예시
+///
+/// ```
+/// use hangul_overlap::{overs_of, OverlapPolicy};
+///
+/// let overs = overs_of('각', OverlapPolicy::empty()).unwrap();
+/// assert!(overs.contains(&'각'));
+/// assert!(overs.contains(&'칵'));
+/// assert_eq!(overs_of('A', OverlapPolicy::empty()), None);
+/// ```
 pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     let bimap = get_bimap(policy);
     let ch = split_hangul(ch)?;
@@ -135,6 +248,33 @@ pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     )
 }
 
+/// `ch` 아래에 놓을 수 있는 글자를 구합니다.
+///
+/// `ch`를 위에 겹칠 글자로 사용하고, `policy`로 추가 자모 관계를 선택합니다.
+/// 두 문자를 직접 판정하려면 [`check_overlap`]을, 위에 겹칠 글자를 구하려면
+/// [`overs_of`]를 사용합니다.
+///
+/// # 반환값
+///
+/// 지원하는 입력이면 후보 목록을 `Some(Vec<char>)`로 반환합니다.
+/// 목록은 중복 없이 유니코드 코드 포인트 오름차순으로 정렬됩니다.
+/// `ch` 자신도 포함하므로 빈 벡터는 반환하지 않습니다.
+/// 지원하지 않는 문자에는 `None`을 반환합니다.
+/// 지원 범위는 [crate 문서의 지원 입력](crate#지원-입력)을 참고하세요.
+///
+/// # 예시
+///
+/// ```
+/// use hangul_overlap::{unders_of, OverlapPolicy};
+///
+/// let unders = unders_of('칵', OverlapPolicy::empty()).unwrap();
+/// assert!(unders.contains(&'칵'));
+/// assert!(unders.contains(&'각'));
+///
+/// let jamo = unders_of('ㄳ', OverlapPolicy::empty()).unwrap();
+/// assert!(jamo.contains(&'ㄳ'));
+/// assert_eq!(unders_of('A', OverlapPolicy::empty()), None);
+/// ```
 pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     let bimap = get_bimap(policy);
     let ch = split_hangul(ch)?;
