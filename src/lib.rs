@@ -494,4 +494,61 @@ mod tests {
             }
         }
     }
+
+    // Generated using AI.
+    const OVERLAP_TEST_SYLLABLES: &[char] = &[
+        '가', '각', '갂', '개', '객', '갸', '걔', '걗',
+        '나', '낙', '까', '깍', '깎', '아', '악', '앆', '앇',
+        '야', '묵', '뷁', '쀏', '햯', '힣',
+    ];
+
+    // Generated using AI.
+    #[test]
+    fn test_check_overlap_overs_of() {
+        let test_chars: Vec<char> = ('ㄱ'..='ㅣ')
+            .chain('꽤'..'꾀')
+            .chain(OVERLAP_TEST_SYLLABLES.iter().copied()).collect();
+
+        for policy_bits in 0..8 {
+            let policy = OverlapPolicy::from_bits_retain(policy_bits);
+            for &under in &test_chars {
+                // 판정 함수로 기대 후보를 구합니다.
+                let expected_overs: Vec<char> = test_chars.iter().copied()
+                    .filter(|&over| check_overlap(under, over, policy).unwrap())
+                    .collect();
+
+                // 조회 함수가 기대 후보를 빠뜨리지 않았는지 확인합니다.
+                let actual_overs = overs_of(under, policy).unwrap();
+                for over in expected_overs {
+                    assert!(actual_overs.contains(&over),
+                        "overs_of({under}, {policy:?}) is missing {over}");
+                }
+            }
+        }
+    }
+
+    // Generated using AI.
+    #[test]
+    fn test_check_overlap_unders_of() {
+        let test_chars: Vec<char> = ('ㄱ'..='ㅣ')
+            .chain('꽤'..'꾀')
+            .chain(OVERLAP_TEST_SYLLABLES.iter().copied()).collect();
+
+        for policy_bits in 0..8 {
+            let policy = OverlapPolicy::from_bits_retain(policy_bits);
+            for &over in &test_chars {
+                // 판정 함수로 기대 후보를 구합니다.
+                let expected_unders: Vec<char> = test_chars.iter().copied()
+                    .filter(|&under| check_overlap(under, over, policy).unwrap())
+                    .collect();
+
+                // 조회 함수가 기대 후보를 빠뜨리지 않았는지 확인합니다.
+                let actual_unders = unders_of(over, policy).unwrap();
+                for under in expected_unders {
+                    assert!(actual_unders.contains(&under),
+                        "unders_of({over}, {policy:?}) is missing {under}");
+                }
+            }
+        }
+    }
 }
