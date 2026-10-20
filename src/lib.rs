@@ -238,9 +238,12 @@ pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
                 || {
                     iproduct!(
                         ('ㄱ'..='ㅎ').map(Some),
-                        ('ㅏ'..='ㅣ').map(Some)
+                        ('ㅏ'..='ㅣ').map(Some),
+                        bimap.get_by_left(&ch.0.unwrap())
+                            .into_iter().flatten().cloned()
+                            .chain([ch.0.unwrap()]).map(Some),
                     ).map(
-                        |(cho, jung)| compose_hangul_jamo(cho, jung, ch.0)
+                        |(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong)
                     )
                 }
             )
