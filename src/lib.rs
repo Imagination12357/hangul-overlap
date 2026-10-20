@@ -296,7 +296,7 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
     let jong_list: Vec<HangulJamo> = match ch.2 {
         Some(jong) => bimap.get_by_right(&jong)
             .into_iter().flatten().cloned()
-            .chain([jong]).map(Some).collect(),
+            .chain([jong]).map(Some).chain([None]).collect(),
         None => [None].into(),
     };
 
