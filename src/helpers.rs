@@ -2,22 +2,6 @@ use mecab_ko_hangul::{
     decompose, is_choseong, is_jungseong, is_jamo, compose
 };
 
-// Generated using AI.
-pub(crate) trait IteratorExt: Iterator + Sized {
-    fn chain_if_lazy<I, F>(
-        self,
-        condition: bool,
-        iter: F,
-    ) -> impl Iterator<Item = Self::Item>
-    where
-        I: IntoIterator<Item = Self::Item>,
-        F: FnOnce() -> I,
-    {
-        self.chain(condition.then(iter).into_iter().flatten())
-    }
-}
-
-impl<I: Iterator> IteratorExt for I {}
 
 pub(crate) type HangulJamo = Option<char>;
 

@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bitflags = "2.13.2"
+chain-if = "0.1.0"
 itertools = "0.15.0"
 mecab-ko-hangul = "0.7.2"
 rustc-hash = "2.1.3"

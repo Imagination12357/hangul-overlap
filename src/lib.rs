@@ -44,7 +44,8 @@ use data::{
 use bitflags::bitflags;
 use itertools::{iproduct, Itertools};
 use std::sync::LazyLock;
-use crate::helpers::{HangulJamo, IteratorExt, compose_hangul_jamo, split_hangul};
+use chain_if::ChainIfExt;
+use crate::helpers::{HangulJamo, compose_hangul_jamo, split_hangul};
 use crate::overlap_map::OverlapMap;
 
 bitflags! {

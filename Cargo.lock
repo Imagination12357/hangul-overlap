@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 
 [[package]]
+name = "chain-if"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "15c33e54e299255a49645d15fc5103c0a1ef13b09216c1739bec2b4485e264c4"
+
+[[package]]
 name = "either"
 version = "1.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19,6 +25,7 @@ name = "hangul-overlap"
 version = "0.1.0"
 dependencies = [
  "bitflags",
+ "chain-if",
  "itertools",
  "mecab-ko-hangul",
  "rustc-hash",
