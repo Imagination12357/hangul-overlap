@@ -11,6 +11,7 @@ use std::hint::black_box;
 // 2011751   404 ms      100       Avoid cloning in iproduct!
 // 1b83642   347 ms      100       Use vec for inner bimap
 // 07827be   309 ms      100       multi_bimap -> FxHashMap-backed overlap map
+// 6ee189e   388 ms      100       fix: missing overlap relations (DC/CC, DC/CC)
 fn main() {
     for _ in 0..100{
         for code in ('가' as u32)..=('나' as u32) {
