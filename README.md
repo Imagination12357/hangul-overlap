@@ -173,4 +173,4 @@ cargo run --release --locked --example profile
 
 ## 라이선스
 
-이 프로젝트는 [MIT 라이선스](LICENSE)에 따라 배포됩니다.
+이 프로젝트는 [MIT 라이선스](LICENSE-MIT) 또는 [Apache License 2.0](LICENSE-APACHE) 중 하나를 선택하여 사용할 수 있습니다.
