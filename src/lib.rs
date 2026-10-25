@@ -40,6 +40,7 @@ use data::{
     DOUBLE_CONSONANT,
     COMPLEX_CONSONANT,
     ASYM_VOWEL,
+    DC_AND_CC,
 };
 use bitflags::bitflags;
 use itertools::{iproduct, Itertools};
@@ -111,7 +112,18 @@ fn build_bimap(policy: OverlapPolicy) -> OverlapMap {
             .chain_if_lazy(policy.contains(OverlapPolicy::DOUBLE_CONSONANT), || DOUBLE_CONSONANT.iter().copied())
             .chain_if_lazy(policy.contains(OverlapPolicy::COMPLEX_CONSONANT), || COMPLEX_CONSONANT.iter().copied())
             .chain_if_lazy(policy.contains(OverlapPolicy::ASYM_VOWEL), || ASYM_VOWEL.iter().copied())
-    )
+    ).extend_with(|bimap| {
+        iproduct!(DC_AND_CC.iter(), DC_AND_CC.iter())
+            .filter_map(|(under, over)| {
+                (
+                    under.0 != over.0
+                    && (bimap.contains_relation(&under.1, &over.1) || under.1 == over.1)
+                    && (bimap.contains_relation(&under.2, &over.2) || under.2 == over.2)
+                )
+                    .then_some((under.0, over.0))
+            })
+            .collect()
+    })
 }
 
 fn check_overlap_jamo(under: HangulJamo, over: HangulJamo, bimap: &OverlapMap) -> bool {
@@ -169,7 +181,7 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
         )
         ||(
             (under.0 == HangulJamo::None && under.1 == HangulJamo::None && under.2 != HangulJamo::None) && (
-                check_overlap_jamo(under.2, over.1, bimap)
+                check_overlap_jamo(under.2, over.0, bimap)
             ) // if under is single complex consonant
         )
     )
@@ -352,6 +364,20 @@ mod tests {
                 expected.extend_from_slice(ASYM_VOWEL);
             }
 
+            // 구성 자음은 서로 같거나 원본 관계표에 있는 방향으로 겹칠 수 있습니다.
+            let mut derived = Vec::new();
+            for &(under, under_first, under_second) in DC_AND_CC {
+                for &(over, over_first, over_second) in DC_AND_CC {
+                    if under != over
+                        && (under_first == over_first || expected.contains(&(under_first, over_first)))
+                        && (under_second == over_second || expected.contains(&(under_second, over_second)))
+                    {
+                        derived.push((under, over));
+                    }
+                }
+            }
+            expected.extend(derived);
+
             let map = get_bimap(policy);
             for &key in &jamo {
                 let rights: Vec<char> = expected.iter()
@@ -394,6 +420,45 @@ mod tests {
             let policy = OverlapPolicy::from_bits_retain(bits);
             let known_policy = policy & OverlapPolicy::all();
             assert!(std::ptr::eq(get_bimap(policy), get_bimap(known_policy)));
+        }
+    }
+
+    // Generated using AI.
+    #[test]
+    fn test_derived_consonant_relations_across_public_apis() {
+        // 기대값은 API의 판정 결과에서 구하지 않고 구체적인 예시로 고정합니다.
+        let cases = [
+            ('ㅆ', 'ㅉ', true),
+            ('ㄺ', 'ㄻ', true),
+            ('ㄺ', 'ㄼ', true),
+            ('ㄻ', 'ㄼ', true),
+            ('ㄳ', 'ㄽ', true),
+            ('ㄳ', 'ㅄ', true),
+            ('쌔', '째', true),
+            ('앍', '앎', true),
+            ('ㄺ', '앎', true),
+            ('ㅉ', 'ㅆ', false),
+            ('ㄻ', 'ㄺ', false),
+            ('ㄼ', 'ㄻ', false),
+            ('ㄽ', 'ㄳ', false),
+            ('ㅄ', 'ㄳ', false),
+            // 한 구성 자음만 덮을 수 있으면 관계가 성립하지 않습니다.
+            ('ㄺ', 'ㄽ', false),
+            ('ㄳ', 'ㄵ', false),
+            ('ㅆ', 'ㅆ', true),
+            ('ㄺ', 'ㄺ', true),
+        ];
+
+        for bits in 0..8 {
+            let policy = OverlapPolicy::from_bits_retain(bits);
+            for (under, over, expected) in cases {
+                assert_eq!(check_overlap(under, over, policy), Some(expected),
+                    "check_overlap({under}, {over}, {policy:?})");
+                assert_eq!(overs_of(under, policy).unwrap().contains(&over), expected,
+                    "overs_of({under}, {policy:?}) contains {over}");
+                assert_eq!(unders_of(over, policy).unwrap().contains(&under), expected,
+                    "unders_of({over}, {policy:?}) contains {under}");
+            }
         }
     }
 

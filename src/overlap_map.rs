@@ -25,6 +25,22 @@ impl OverlapMap {
         map
     }
 
+    /// Derives additional pairs from the current relations, then appends them.
+    /// The closure runs once before either direction is updated; duplicates are preserved.
+    pub(crate) fn extend_with(
+        mut self,
+        derive: impl FnOnce(&Self) -> Vec<(char, char)>,
+    ) -> Self {
+        let pairs = derive(&self);
+
+        for (left, right) in pairs {
+            self.left_to_right.entry(left).or_default().push(right);
+            self.right_to_left.entry(right).or_default().push(left);
+        }
+
+        self
+    }
+
     pub(crate) fn get_by_left(&self, left: &char) -> Option<&[char]> {
         self.left_to_right.get(left).map(Vec::as_slice)
     }
@@ -71,5 +87,29 @@ mod tests {
         assert_eq!(map.get_by_left(&'ㄱ'), None);
         assert_eq!(map.get_by_right(&'ㄹ'), None);
         assert!(!map.contains_relation(&'ㄱ', &'ㄹ'));
+    }
+
+    #[test]
+    fn extends_from_existing_relations_in_both_directions() {
+        let additions = vec![('ㄱ', 'ㄹ'), ('ㄴ', 'ㄹ')];
+        let map = OverlapMap::from_pairs([('ㄱ', 'ㄹ')]).extend_with(|base| {
+            assert!(base.contains_relation(&'ㄱ', &'ㄹ'));
+            assert!(!base.contains_relation(&'ㄴ', &'ㄹ'));
+            additions
+        });
+
+        assert_eq!(map.get_by_left(&'ㄱ'), Some(&['ㄹ', 'ㄹ'][..]));
+        assert_eq!(map.get_by_left(&'ㄴ'), Some(&['ㄹ'][..]));
+        assert_eq!(map.get_by_right(&'ㄹ'), Some(&['ㄱ', 'ㄱ', 'ㄴ'][..]));
+        assert!(map.contains_relation(&'ㄴ', &'ㄹ'));
+        assert!(!map.contains_relation(&'ㄹ', &'ㄴ'));
+    }
+
+    #[test]
+    fn empty_extension_preserves_existing_relations() {
+        let map = OverlapMap::from_pairs([('ㄱ', 'ㄹ')])
+            .extend_with(|_| Vec::new());
+
+        assert_eq!(map, OverlapMap::from_pairs([('ㄱ', 'ㄹ')]));
     }
 }
