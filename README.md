@@ -15,12 +15,15 @@ assert_eq!(check_overlap('가', '나', policy), Some(false));
 ```
 
 ## 설치
+```sh
+cargo add hangul-overlap
+```
 
-프로젝트의 `Cargo.toml`에 다음 의존성을 추가합니다.
+또는, 프로젝트의 `Cargo.toml`에 다음 의존성을 추가합니다.
 
 ```toml
 [dependencies]
-hangul-overlap = { git = "https://github.com/Imagination12357/hangul-overlap.git" }
+hangul-overlap = "0.1"
 ```
 
 코드에서는 `use hangul_overlap::...`으로 가져옵니다.
