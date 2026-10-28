@@ -175,12 +175,12 @@ pub fn check_overlap(under: char, over: char, policy: OverlapPolicy) -> Option<b
         && check_overlap_jamo(under.1, over.1, bimap)
         && check_overlap_jamo(under.2, over.2, bimap)
         ||(
-            (under.0 != HangulJamo::None && under.1 == HangulJamo::None && under.2 == HangulJamo::None) && (
+            (under.0.is_some() && under.1.is_none() && under.2.is_none()) && (
                 check_overlap_jamo(under.0, over.2, bimap)
             ) // if under is single consonant
         )
         ||(
-            (under.0 == HangulJamo::None && under.1 == HangulJamo::None && under.2 != HangulJamo::None) && (
+            (under.0.is_none() && under.1.is_none() && under.2.is_some()) && (
                 check_overlap_jamo(under.2, over.0, bimap)
             ) // if under is single complex consonant
         )
@@ -247,7 +247,7 @@ pub fn overs_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
         )
             .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
             .chain_if_lazy(
-                ch.0 != None && ch.1 == None && ch.2 == None,
+                ch.0.is_some() && ch.1.is_none() && ch.2.is_none(),
                 || {
                     iproduct!(
                         ('ㄱ'..='ㅎ').map(Some),
@@ -324,17 +324,17 @@ pub fn unders_of(ch: char, policy: OverlapPolicy) -> Option<Vec<char>> {
         )
             .map(|(cho, jung, jong)| compose_hangul_jamo(cho, jung, jong))
             .chain_if_lazy(
-                ch.0 != None,
+                ch.0.is_some(),
                 || bimap.get_by_right(&ch.0.unwrap())
                     .into_iter().flatten().copied().chain([ch.0.unwrap()]).map(Some)
             )
             .chain_if_lazy(
-                ch.1 != None,
+                ch.1.is_some(),
                 || bimap.get_by_right(&ch.1.unwrap())
                     .into_iter().flatten().copied().chain([ch.1.unwrap()]).map(Some)
             )
             .chain_if_lazy(
-                ch.2 != None,
+                ch.2.is_some(),
                 || bimap.get_by_right(&ch.2.unwrap())
                     .into_iter().flatten().copied().chain([ch.2.unwrap()]).map(Some)
             )
