@@ -2,6 +2,13 @@
 name = "hangul-overlap"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85.0"
+description = "한글 문자끼리 겹칠 수 있는지 판정하고, 겹칠 수 있는 글자를 찾는 Rust 라이브러리"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/Imagination12357/hangul-overlap"
+keywords = ["hangul", "korean", "unicode"]
+categories = ["text-processing"]
+exclude = ["/reference.xlsx"]
 
 [dependencies]
 bitflags = "2.13.2"
